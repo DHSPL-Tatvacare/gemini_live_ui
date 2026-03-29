@@ -1,0 +1,305 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	:root {
+		color-scheme: dark;
+		--bg-0: #08111F;
+		--bg-1: #0F1729;
+		--bg-2: #12253D;
+		--line: rgba(255, 255, 255, 0.1);
+		--line-strong: rgba(125, 211, 252, 0.28);
+		--text-soft: rgba(226, 232, 240, 0.78);
+	}
+	
+	* {
+		@apply border-slate-800;
+	}
+	
+	html {
+		@apply antialiased;
+		height: 100%;
+		overflow: hidden;
+		font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+		background: radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 28%),
+		radial-gradient(circle at top right, rgba(251, 191, 36, 0.16), transparent 24%),
+		linear-gradient(180deg, var(--bg-0), var(--bg-1) 42%, #050B16 100%);
+	}
+	
+	body {
+		@apply h-full overflow-hidden text-slate-100;
+		margin: 0;
+		background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 20%),
+		radial-gradient(circle at 20% 0%, rgba(56, 189, 248, 0.12), transparent 25%),
+		radial-gradient(circle at 80% 0%, rgba(251, 191, 36, 0.12), transparent 18%);
+	}
+	
+	#root {
+		height: 100%;
+		overflow: hidden;
+	}
+	
+	code,
+	pre {
+		font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+	}
+	
+	button,
+	input,
+	select,
+	textarea {
+		font: inherit;
+	}
+}
+
+@layer components {
+	.glass-panel {
+		@apply relative rounded-[2rem] border border-white/10 bg-white/[0.045] shadow-2xl shadow-slate-950/30 backdrop-blur-xl;
+	}
+	
+	.font-display {
+		font-family: "Sora", "Space Grotesk", "Avenir Next", sans-serif;
+	}
+	
+	.input {
+		@apply w-full rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-sky-300/40 focus:bg-slate-950/75 focus:ring-2 focus:ring-sky-300/10;
+	}
+	
+	.slider {
+		@apply h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10;
+	}
+	
+	.slider::-webkit-slider-thumb {
+		@apply h-4 w-4 appearance-none rounded-full border-0 bg-sky-300;
+		box-shadow: 0 0 0 6px rgba(125, 211, 252, 0.15);
+	}
+	
+	.slider::-moz-range-thumb {
+		@apply h-4 w-4 appearance-none rounded-full border-0 bg-sky-300;
+		box-shadow: 0 0 0 6px rgba(125, 211, 252, 0.15);
+	}
+	
+	.studio-shell {
+		@apply grid h-screen overflow-hidden bg-[#121212] text-slate-100 lg:grid-cols-[15rem_minmax(0,1fr)];
+		grid-template-columns: 15rem minmax(0, 1fr);
+	}
+	
+	.studio-sidebar {
+		@apply flex min-h-0 flex-col justify-between overflow-hidden border-r border-white/10 bg-[#171717] px-4 py-5;
+	}
+	
+	.studio-main {
+		@apply flex min-h-0 flex-1 flex-col overflow-hidden;
+	}
+	
+	.studio-topbar {
+		@apply flex items-center justify-between border-b border-white/10 bg-[#171717] px-5 py-4;
+	}
+	
+	.icon-button {
+		@apply inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-slate-300 transition hover:bg-white/[0.08];
+	}
+	
+	.sidebar-link {
+		@apply flex w-full items-center justify-between rounded-xl border border-transparent px-3 py-2.5 text-sm text-slate-400 transition hover:bg-white/[0.04] hover:text-white;
+	}
+	
+	.sidebar-link-active {
+		@apply border-white/10 bg-white/[0.06] text-white;
+	}
+	
+	.sidebar-link-label {
+		@apply transition-all duration-200;
+	}
+	
+	.sidebar-panel {
+		max-height: 16rem;
+		overflow: hidden;
+		opacity: 1;
+		transform: translateX(0);
+		transition: max-height 260ms ease,
+		opacity 180ms ease,
+		transform 260ms ease,
+		margin 260ms ease,
+		padding 260ms ease;
+	}
+	
+	.status-pill {
+		@apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-slate-300;
+	}
+	
+	.status-pill-ready {
+		@apply border-emerald-400/30 bg-emerald-400/10 text-emerald-200;
+	}
+	
+	.status-pill-error {
+		@apply border-rose-400/30 bg-rose-400/10 text-rose-200;
+	}
+	
+	.playground-layout {
+		@apply flex min-h-0 flex-1 flex-col;
+	}
+	
+	.playground-stage {
+		@apply relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#191919] px-6 py-8;
+	}
+	
+	.playground-empty {
+		@apply mx-auto flex max-w-3xl flex-col items-center px-6 text-center;
+	}
+	
+	.eyebrow {
+		@apply rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-slate-400;
+	}
+	
+	.playground-subtitle {
+		@apply mt-5 max-w-2xl text-sm leading-7 text-slate-400;
+	}
+	
+	.playground-hint {
+		@apply mt-6 text-sm text-slate-500;
+	}
+	
+	.conversation-shell {
+		@apply mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col;
+	}
+	
+	.conversation-feed {
+		@apply mx-auto flex h-full w-full max-w-4xl flex-col gap-4 overflow-y-auto px-2 pb-8 pt-4;
+		scrollbar-width: none;
+		-ms-overflow-style: none;
+	}
+	
+	.conversation-feed::-webkit-scrollbar {
+		display: none;
+	}
+	
+	.chat-bubble {
+		@apply max-w-[44rem] rounded-[1.4rem] border px-4 py-3 shadow-lg shadow-black/10;
+	}
+	
+	.chat-bubble-user {
+		@apply ml-auto border-sky-400/20 bg-sky-400/10 text-sky-50;
+	}
+	
+	.chat-bubble-assistant {
+		@apply border-white/10 bg-[#242424] text-slate-100;
+	}
+	
+	.chat-bubble-system {
+		@apply border-amber-300/20 bg-amber-300/10 text-amber-100;
+	}
+	
+	.chat-bubble-tool {
+		@apply border-emerald-300/20 bg-emerald-300/10 text-emerald-100;
+	}
+	
+	.chat-bubble-user-transcript {
+		@apply ml-auto border-sky-300/15 bg-sky-300/5 text-sky-100/90;
+	}
+	
+	.chat-bubble-assistant-transcript {
+		@apply border-white/10 bg-white/[0.035] text-slate-300;
+	}
+	
+	.stage-button {
+		@apply inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-50;
+	}
+	
+	.stage-button-active {
+		@apply border-sky-400/30 bg-sky-400/10 text-sky-100;
+	}
+	
+	.stage-preview-frame {
+		@apply absolute bottom-6 right-6 h-44 w-72 overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40;
+	}
+	
+	.preview-frame-label {
+		@apply absolute left-3 top-3 z-10 rounded-full bg-black/55 px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] text-white/80 backdrop-blur;
+	}
+	
+	.composer-shell {
+		@apply border-t border-white/10 bg-[#171717] px-6 py-5;
+	}
+	
+	.composer-inner {
+		@apply mx-auto w-full max-w-4xl;
+	}
+	
+	.composer-input {
+		@apply w-full rounded-[1.35rem] border border-white/10 bg-[#262626] px-4 py-4 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-slate-500/40 focus:bg-[#2c2c2c];
+	}
+	
+	.composer-toolbar {
+		@apply mt-3 flex flex-wrap items-center justify-between gap-3;
+	}
+	
+	.toolbar-pill {
+		@apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-300;
+	}
+	
+	.toolbar-status {
+		@apply text-sm text-slate-500;
+	}
+	
+	.round-icon-button {
+		@apply inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-slate-200 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-45;
+	}
+	
+	.run-button {
+		@apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-medium text-white transition hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-45;
+	}
+	
+	.settings-layout {
+		@apply grid h-full min-h-0 gap-6 overflow-y-auto p-6 xl:grid-cols-3;
+	}
+	
+	.settings-column {
+		@apply flex flex-col gap-6;
+	}
+	
+	.settings-card {
+		@apply rounded-3xl border border-white/10 bg-[#1a1a1a] p-5;
+	}
+	
+	.settings-value-card {
+		@apply rounded-2xl border border-white/10 bg-white/[0.03] p-4;
+	}
+	
+	.settings-input {
+		@apply w-full rounded-xl border border-white/10 bg-[#252525] px-3 py-3 text-sm text-slate-100 outline-none transition focus:border-slate-500/40;
+	}
+	
+	.settings-slider {
+		@apply w-full;
+	}
+	
+	.settings-code {
+		@apply max-h-[34rem] overflow-auto rounded-2xl border border-white/10 bg-[#111111] p-4 text-xs leading-6 text-slate-300;
+	}
+	
+	.debug-panel {
+		@apply max-h-[30rem] overflow-y-auto rounded-2xl border border-white/10 bg-[#111111] p-4 font-mono text-xs text-slate-300;
+	}
+	
+	.debug-line {
+		@apply whitespace-pre-wrap border-b border-white/5 py-2 last:border-0;
+	}
+	
+	.inline-toggle {
+		@apply flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-200;
+	}
+	
+	.system-layout {
+		@apply flex h-full min-h-0 flex-1 items-start justify-center overflow-y-auto px-6 py-8;
+	}
+	
+	.system-editor-card {
+		@apply w-full max-w-5xl rounded-[2rem] border border-white/10 bg-[#1a1a1a] p-6;
+	}
+	
+	.system-editor {
+		@apply min-h-[28rem] w-full rounded-[1.5rem] border border-white/10 bg-[#111111] p-5 text-sm leading-7 text-slate-100 outline-none transition focus:border-slate-500/40;
+	}
+}

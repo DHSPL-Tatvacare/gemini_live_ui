@@ -29,3 +29,4 @@ coverage/
 # Local Codex files
 .codex/
 .codexignore/
+AGENTS.md

@@ -206,6 +206,30 @@ export default function App() {
 			setDebugLines((current) => [...current.slice(-23), stamped])
 		})
 	}, [])
+
+	const handleStageWheel = useCallback((event) => {
+		const feed = conversationFeedRef.current
+		
+		if (!feed) {
+			return
+		}
+		
+		const target = event.target
+		if (target instanceof Node && feed.contains(target)) {
+			return
+		}
+		
+		if (feed.scrollHeight <= feed.clientHeight) {
+			return
+		}
+		
+		event.preventDefault()
+		feed.scrollBy({
+			top: event.deltaY,
+			left: event.deltaX,
+			behavior: 'auto'
+		})
+	}, [])
 	
 	const addMessage = useCallback((kind, text, {append = false} = {}) => {
 		startTransition(() => {
@@ -772,13 +796,31 @@ export default function App() {
 					</div>
 					
 					<div className='flex items-center gap-3'>
-						{status === 'error' || !hasLiveToken ? (
+						{!hasLiveToken ? (
 							<button
 								type='button'
 								className='run-button'
 								onClick={refreshEphemeralToken}
 							>
-								{hasLiveToken ? 'Generate New Token' : 'Generate Token'}
+								Generate Token
+							</button>
+						) : (
+							<button
+								type='button'
+								className='run-button'
+								onClick={canDisconnect ? disconnect : connect}
+								disabled={!canConnect && !canDisconnect}
+							>
+								{canDisconnect ? 'Disconnect' : 'Connect'}
+							</button>
+						)}
+						{hasLiveToken && status === 'error' ? (
+							<button
+								type='button'
+								className='run-button'
+								onClick={refreshEphemeralToken}
+							>
+								Generate New Token
 							</button>
 						) : null}
 						<StatusPill
@@ -808,6 +850,7 @@ export default function App() {
 						setChatInput={setChatInput}
 						sendTextMessage={sendTextMessage}
 						conversationFeedRef={conversationFeedRef}
+						handleStageWheel={handleStageWheel}
 						previewRef={previewRef}
 						previewStream={previewStream}
 						previewTitle={previewTitle}
@@ -857,6 +900,7 @@ function PlaygroundView({
 	                        setChatInput,
 	                        sendTextMessage,
 	                        conversationFeedRef,
+	                        handleStageWheel,
 	                        previewRef,
 	                        previewStream,
 	                        previewTitle
@@ -866,7 +910,7 @@ function PlaygroundView({
 	
 	return (
 		<div className='playground-layout'>
-			<section className='playground-stage'>
+			<section className='playground-stage' onWheel={showFeed ? handleStageWheel : undefined}>
 				{showFeed ? (
 					<div className='conversation-shell'>
 						<div ref={conversationFeedRef} className='conversation-feed'>
@@ -963,14 +1007,6 @@ function PlaygroundView({
 					
 					<div className='composer-toolbar'>
 						<div className='flex items-center gap-2'>
-							<button
-								type='button'
-								className='run-button'
-								onClick={canDisconnect ? disconnect : connect}
-								disabled={!canConnect && !canDisconnect}
-							>
-								{canDisconnect ? 'Disconnect' : 'Connect'}
-							</button>
 							<RoundIconButton
 								onClick={toggleMic}
 								disabled={!canInteract}

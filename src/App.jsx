@@ -75,19 +75,115 @@ function readStoredLiveToken() {
 	return window.localStorage.getItem(LIVE_TOKEN_STORAGE_KEY) || ''
 }
 
-function createMessage(kind, text) {
+function createMessage(kind, text, extra = {}) {
 	return {
 		id:
 			typeof crypto !== 'undefined' && crypto.randomUUID
 				? crypto.randomUUID()
 				: `${kind}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
 		kind,
-		text
+		text,
+		...extra
 	}
 }
 
 function classNames(...values) {
 	return values.filter(Boolean).join(' ')
+}
+
+function readUsageNumber(value) {
+	return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function countPresentUsageFields(values) {
+	return values.filter((value) => value !== null).length
+}
+
+function normalizeUsageMetadata(usageMetadata) {
+	if (!usageMetadata || typeof usageMetadata !== 'object') {
+		return null
+	}
+	
+	const inputTokens = readUsageNumber(
+		usageMetadata.promptTokenCount ?? usageMetadata.inputTokenCount
+	)
+	const outputTokens = readUsageNumber(
+		usageMetadata.responseTokenCount ??
+			usageMetadata.outputTokenCount ??
+			usageMetadata.candidatesTokenCount
+	)
+	const toolUsePromptTokens = readUsageNumber(usageMetadata.toolUsePromptTokenCount)
+	const thoughtsTokens = readUsageNumber(usageMetadata.thoughtsTokenCount)
+	const totalTokens = readUsageNumber(usageMetadata.totalTokenCount)
+	const partialKnownTokens = [inputTokens, outputTokens, toolUsePromptTokens, thoughtsTokens]
+		.reduce((sum, value) => sum + (value || 0), 0)
+	const presentFieldCount = countPresentUsageFields([
+		inputTokens,
+		outputTokens,
+		toolUsePromptTokens,
+		thoughtsTokens,
+		totalTokens
+	])
+	
+	if (totalTokens === null && presentFieldCount === 0) {
+		return null
+	}
+	
+	return {
+		raw: usageMetadata,
+		inputTokens,
+		outputTokens,
+		toolUsePromptTokens,
+		thoughtsTokens,
+		turnTotalTokens: totalTokens,
+		isAuthoritative: totalTokens !== null,
+		partialKnownTokens,
+		presentFieldCount
+	}
+}
+
+function shouldReplacePendingUsage(currentUsage, nextUsage) {
+	if (!currentUsage) {
+		return true
+	}
+	
+	if (currentUsage.isAuthoritative !== nextUsage.isAuthoritative) {
+		return nextUsage.isAuthoritative
+	}
+	
+	if (nextUsage.isAuthoritative) {
+		return (nextUsage.turnTotalTokens || 0) >= (currentUsage.turnTotalTokens || 0)
+	}
+	
+	if (nextUsage.presentFieldCount !== currentUsage.presentFieldCount) {
+		return nextUsage.presentFieldCount > currentUsage.presentFieldCount
+	}
+	
+	return nextUsage.partialKnownTokens >= currentUsage.partialKnownTokens
+}
+
+function formatTokenCount(value) {
+	return value.toLocaleString()
+}
+
+function formatUsageLabel(usage) {
+	if (!usage) {
+		return 'Token count'
+	}
+	
+	if (usage.isAuthoritative && typeof usage.turnTotalTokens === 'number') {
+		return `Token count: ${formatTokenCount(usage.turnTotalTokens)}`
+	}
+	
+	if (usage.partialKnownTokens > 0) {
+		return `Token count: partial (${formatTokenCount(usage.partialKnownTokens)}+)`
+	}
+	
+	return 'Token count: partial'
+}
+
+function formatUsageValue(value) {
+	return value === null || value === undefined ? 'Unavailable' : formatTokenCount(value)
 }
 
 function formatTimestamp() {
@@ -140,6 +236,9 @@ export default function App() {
 	const screenRef = useRef(null)
 	const settingsRef = useRef(settings)
 	const closeRequestedRef = useRef(false)
+	const pendingTurnUsageRef = useRef(null)
+	const sessionTotalTokensRef = useRef(0)
+	const sessionHasPartialUsageRef = useRef(false)
 	
 	useEffect(() => {
 		settingsRef.current = settings
@@ -231,7 +330,7 @@ export default function App() {
 		})
 	}, [])
 	
-	const addMessage = useCallback((kind, text, {append = false} = {}) => {
+	const addMessage = useCallback((kind, text, {append = false, ...extra} = {}) => {
 		startTransition(() => {
 			setMessages((current) => {
 				if (
@@ -247,7 +346,7 @@ export default function App() {
 					return next
 				}
 				
-				return [...current, createMessage(kind, text)]
+				return [...current, createMessage(kind, text, extra)]
 			})
 		})
 	}, [])
@@ -328,6 +427,15 @@ export default function App() {
 	function handleSessionMessage(message) {
 		const currentSession = sessionRef.current
 		const content = message.serverContent
+		const normalizedUsage = normalizeUsageMetadata(message.usageMetadata)
+		
+		if (normalizedUsage && shouldReplacePendingUsage(pendingTurnUsageRef.current, normalizedUsage)) {
+			pendingTurnUsageRef.current = normalizedUsage
+		}
+		
+		if (message.usageMetadata) {
+			addDebugLine(`Usage metadata snapshot: ${JSON.stringify(message.usageMetadata)}`)
+		}
 		
 		if (message.setupComplete) {
 			const sessionId = message.setupComplete.sessionId || 'unknown'
@@ -403,6 +511,33 @@ export default function App() {
 		if (content.turnComplete) {
 			const reason = content.turnCompleteReason || 'TURN_COMPLETE_REASON_UNSPECIFIED'
 			addDebugLine(`Turn complete. Reason: ${reason}`)
+			
+			if (pendingTurnUsageRef.current) {
+				const usage = pendingTurnUsageRef.current
+				
+				if (usage.isAuthoritative) {
+					sessionTotalTokensRef.current += usage.turnTotalTokens || 0
+				}
+				else {
+					sessionHasPartialUsageRef.current = true
+				}
+				
+				const sessionTotalTokens = sessionTotalTokensRef.current
+				pendingTurnUsageRef.current = null
+				
+				addMessage('usage', '', {
+					usage: {
+						...usage,
+						sessionTotalTokens,
+						sessionTotalIsLowerBound: sessionHasPartialUsageRef.current
+					}
+				})
+				addDebugLine(
+					usage.isAuthoritative
+						? `Tokens used. Turn total: ${usage.turnTotalTokens}, Session total: ${sessionTotalTokens}`
+						: `Partial token usage only. Prompt=${usage.inputTokens ?? 'n/a'}, Response=${usage.outputTokens ?? 'n/a'}, ToolUse=${usage.toolUsePromptTokens ?? 'n/a'}, Thoughts=${usage.thoughtsTokens ?? 'n/a'}`
+				)
+			}
 		}
 	}
 	
@@ -419,6 +554,9 @@ export default function App() {
 		}
 		
 		closeRequestedRef.current = false
+		pendingTurnUsageRef.current = null
+		sessionTotalTokensRef.current = 0
+		sessionHasPartialUsageRef.current = false
 		setStatus('connecting')
 		setIsSessionReady(false)
 		setStatusDetail('Connecting to Gemini Live...')
@@ -524,6 +662,9 @@ export default function App() {
 	
 	const teardownSession = useCallback(() => {
 		closeRequestedRef.current = true
+		pendingTurnUsageRef.current = null
+		sessionTotalTokensRef.current = 0
+		sessionHasPartialUsageRef.current = false
 		teardownMedia()
 		
 		if (sessionRef.current) {
@@ -1436,6 +1577,7 @@ function InlineToggle({label, checked, onChange}) {
 
 function ChatBubble({message}) {
 	const [isExpanded, setIsExpanded] = useState(false)
+	const [isUsageModalOpen, setIsUsageModalOpen] = useState(false)
 	const bubbleClass = {
 		user: 'chat-bubble-user',
 		assistant: 'chat-bubble-assistant',
@@ -1450,6 +1592,7 @@ function ChatBubble({message}) {
 		assistant: 'Gemini',
 		system: 'System',
 		tool: 'Tool',
+		usage: 'Usage',
 		'user-transcript': 'You, transcribed',
 		'assistant-transcript': 'Gemini, transcribed'
 	}[message.kind]
@@ -1466,6 +1609,132 @@ function ChatBubble({message}) {
 		
 		return 'Tool result'
 	})()
+	
+	const usage = message.usage
+	
+	useEffect(() => {
+		if (!isUsageModalOpen) {
+			return
+		}
+		
+		function handleKeyDown(event) {
+			if (event.key === 'Escape') {
+				setIsUsageModalOpen(false)
+			}
+		}
+		
+		window.addEventListener('keydown', handleKeyDown)
+		return () => {
+			window.removeEventListener('keydown', handleKeyDown)
+		}
+	}, [isUsageModalOpen])
+	
+	if (message.kind === 'usage' && usage) {
+		const responseDetails = Array.isArray(usage.raw?.responseTokensDetails)
+			? usage.raw.responseTokensDetails
+			: []
+		const promptDetails = Array.isArray(usage.raw?.promptTokensDetails)
+			? usage.raw.promptTokensDetails
+			: []
+		const toolUseDetails = Array.isArray(usage.raw?.toolUsePromptTokensDetails)
+			? usage.raw.toolUsePromptTokensDetails
+			: []
+		
+		return (
+			<>
+				<div className='usage-inline-row'>
+					<button
+						type='button'
+						className='usage-inline-trigger'
+						onClick={() => setIsUsageModalOpen(true)}
+					>
+						{formatUsageLabel(usage)}
+					</button>
+				</div>
+				{isUsageModalOpen ? (
+					<div
+						className='usage-modal-backdrop'
+						role='presentation'
+						onClick={() => setIsUsageModalOpen(false)}
+					>
+						<div
+							className='usage-modal'
+							role='dialog'
+							aria-modal='true'
+							aria-labelledby={`usage-modal-title-${message.id}`}
+							onClick={(event) => event.stopPropagation()}
+						>
+							<div className='usage-modal-header'>
+								<div>
+									<div className='usage-modal-kicker'>Usage</div>
+									<h2
+										id={`usage-modal-title-${message.id}`}
+										className='usage-modal-title'
+									>
+										API-reported token usage
+									</h2>
+								</div>
+								<button
+									type='button'
+									className='usage-modal-close'
+									onClick={() => setIsUsageModalOpen(false)}
+								>
+									Close
+								</button>
+							</div>
+							<div className='usage-modal-body'>
+								<div className='usage-modal-grid'>
+									<UsageStat
+										label='Turn total'
+										value={
+											usage.isAuthoritative
+												? formatUsageValue(usage.turnTotalTokens)
+												: 'Partial only'
+										}
+									/>
+									<UsageStat
+										label='Session total'
+										value={
+											usage.sessionTotalIsLowerBound
+												? `At least ${formatUsageValue(usage.sessionTotalTokens)}`
+												: formatUsageValue(usage.sessionTotalTokens)
+										}
+									/>
+									<UsageStat label='Prompt' value={formatUsageValue(usage.inputTokens)} />
+									<UsageStat label='Response' value={formatUsageValue(usage.outputTokens)} />
+									<UsageStat
+										label='Tool use prompt'
+										value={formatUsageValue(usage.toolUsePromptTokens)}
+									/>
+									<UsageStat
+										label='Thoughts'
+										value={formatUsageValue(usage.thoughtsTokens)}
+									/>
+								</div>
+								
+								{!usage.isAuthoritative ? (
+									<div className='usage-modal-note'>
+										This turn did not include `totalTokenCount`, so the usage is partial.
+									</div>
+								) : null}
+								
+								<UsageDetailsSection title='Prompt Modalities' details={promptDetails}/>
+								<UsageDetailsSection title='Response Modalities' details={responseDetails}/>
+								<UsageDetailsSection title='Tool Use Modalities' details={toolUseDetails}/>
+								
+								<div className='usage-modal-section'>
+									<div className='usage-modal-section-title'>Raw Usage Metadata</div>
+									<pre className='usage-modal-code'>
+										{JSON.stringify(usage.raw, null, 2)}
+									</pre>
+								</div>
+							</div>
+						</div>
+					</div>
+				) : null}
+			</>
+		)
+	}
 	
 	return (
 		<article className={classNames('chat-bubble', bubbleClass)}>
@@ -1493,5 +1762,37 @@ function ChatBubble({message}) {
 				<div className='whitespace-pre-wrap text-base leading-6'>{message.text}</div>
 			)}
 		</article>
+	)
+}
+
+function UsageStat({label, value}) {
+	return (
+		<div className='usage-stat-card'>
+			<div className='usage-stat-label'>{label}</div>
+			<div className='usage-stat-value'>{value}</div>
+		</div>
+	)
+}
+
+function UsageDetailsSection({title, details}) {
+	if (!details.length) {
+		return null
+	}
+	
+	return (
+		<div className='usage-modal-section'>
+			<div className='usage-modal-section-title'>{title}</div>
+			<div className='usage-detail-list'>
+				{details.map((detail, index) => (
+					<div
+						key={`${title}-${detail.modality || 'unknown'}-${detail.tokenCount || 0}-${index}`}
+						className='usage-detail-row'
+					>
+						<span>{detail.modality || 'UNKNOWN'}</span>
+						<span>{typeof detail.tokenCount === 'number' ? formatTokenCount(detail.tokenCount) : 'Unavailable'}</span>
+					</div>
+				))}
+			</div>
+		</div>
 	)
 }

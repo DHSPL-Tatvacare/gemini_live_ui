@@ -305,3 +305,4 @@ This codebase is useful when you want to experiment with:
 - ephemeral token workflows for Live sessions
 
 If you are looking for a minimal API sample, this repo is more opinionated than that. If you are looking for a practical Live playground you can inspect and modify quickly, this is the right shape.
+# ai_gemini_live_ui
